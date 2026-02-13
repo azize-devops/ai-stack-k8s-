@@ -52,4 +52,23 @@ fine-tuning/data/*.jsonl
 llm-comparison/benchmark_results.json
 
 # Docker
-.dockerignore
+# (dockerignore files are tracked in repo)
+
+# Secrets and certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+kubeconfig
+kubeconfig.*
+*secret*
+!SECURITY.md
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Output directories
+output/

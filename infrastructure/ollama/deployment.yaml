@@ -16,9 +16,17 @@ spec:
       labels:
         app: ollama
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
         - name: pull-models
-          image: ollama/ollama:latest
+          image: ollama/ollama:0.5.4
           command:
             - sh
             - -c
@@ -28,9 +36,14 @@ spec:
               ollama pull tinyllama
               ollama pull phi3:mini
               kill %1
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
             - name: ollama-data
-              mountPath: /root/.ollama
+              mountPath: /home/ollama/.ollama
           resources:
             requests:
               cpu: "1"
@@ -40,7 +53,12 @@ spec:
               memory: "4Gi"
       containers:
         - name: ollama
-          image: ollama/ollama:latest
+          image: ollama/ollama:0.5.4
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           ports:
             - containerPort: 11434
               name: http
@@ -50,17 +68,20 @@ spec:
               value: "0.0.0.0"
             - name: NVIDIA_VISIBLE_DEVICES
               value: "all"
+            - name: HOME
+              value: "/home/ollama"
           resources:
             requests:
               cpu: "2"
               memory: "4Gi"
+              nvidia.com/gpu: "1"
             limits:
               cpu: "4"
               memory: "8Gi"
               nvidia.com/gpu: "1"
           volumeMounts:
             - name: ollama-data
-              mountPath: /root/.ollama
+              mountPath: /home/ollama/.ollama
           livenessProbe:
             httpGet:
               path: /

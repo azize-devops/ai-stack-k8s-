@@ -81,6 +81,9 @@ class FinetuneConfig:
     gradient_checkpointing: bool = True
     logging_steps: int = 5
 
+    # Security
+    trust_remote_code: bool = False
+
     # Paths
     dataset_path: str = "data/sample_dataset.jsonl"
     output_dir: str = "output/qlora-run"
@@ -172,7 +175,7 @@ def load_quantized_model(
         model_name,
         quantization_config=bnb_config,
         device_map="auto",
-        trust_remote_code=True,
+        trust_remote_code=config.trust_remote_code,
     )
 
     # Prepare the quantised model for LoRA training.
@@ -281,7 +284,7 @@ def train(config: FinetuneConfig) -> None:
     logger.info("Loading tokenizer for %s", config.model_name)
     tokenizer = AutoTokenizer.from_pretrained(
         config.model_name,
-        trust_remote_code=True,
+        trust_remote_code=config.trust_remote_code,
     )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -419,6 +422,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Disable gradient checkpointing (uses more VRAM but is faster).",
     )
+    parser.add_argument(
+        "--trust-remote-code",
+        action="store_true",
+        default=False,
+        help="Allow executing remote code from HuggingFace model repos (default: False).",
+    )
     return parser.parse_args()
 
 
@@ -438,6 +447,7 @@ def main() -> None:
         lora_alpha=args.lora_alpha,
         lora_dropout=args.lora_dropout,
         gradient_checkpointing=not args.no_gradient_checkpointing,
+        trust_remote_code=args.trust_remote_code,
     )
 
     # Print a compact summary before starting.

@@ -13,13 +13,16 @@ from __future__ import annotations
 import hashlib
 import logging
 import math
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
 import openai
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from qdrant_client import QdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
@@ -213,11 +216,15 @@ async def lifespan(_app: FastAPI):
     )
 
     # Qdrant client
-    _qdrant_client = QdrantClient(
-        host=settings.qdrant_host,
-        port=settings.qdrant_port,
-        timeout=30,
-    )
+    qdrant_kwargs: dict[str, Any] = {
+        "host": settings.qdrant_host,
+        "port": settings.qdrant_port,
+        "timeout": 30,
+    }
+    if settings.qdrant_api_key:
+        qdrant_kwargs["api_key"] = settings.qdrant_api_key
+
+    _qdrant_client = QdrantClient(**qdrant_kwargs)
 
     logger.info("RAG pipeline server ready")
     yield
@@ -240,7 +247,43 @@ app = FastAPI(
     ),
     version=APP_VERSION,
     lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
 )
+
+# CORS middleware
+_cors_origins = os.getenv("CORS_ORIGINS", "").split(",")
+_cors_origins = [o.strip() for o in _cors_origins if o.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["X-API-Key", "Content-Type"],
+)
+
+
+# ---------------------------------------------------------------------------
+# API Key Authentication Middleware
+# ---------------------------------------------------------------------------
+
+_API_KEY = os.getenv("RAG_API_KEY", "")
+
+_PUBLIC_PATHS = {"/health", "/openapi.json"}
+
+
+@app.middleware("http")
+async def api_key_auth(request: Request, call_next):
+    """Validate X-API-Key header on protected endpoints."""
+    if _API_KEY and request.url.path not in _PUBLIC_PATHS:
+        provided = request.headers.get("X-API-Key", "")
+        if provided != _API_KEY:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or missing API key"},
+            )
+    return await call_next(request)
 
 
 # ---------------------------------------------------------------------------
@@ -295,11 +338,7 @@ def chunk_text(
 
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:
-    """Generate dense embeddings for a batch of texts via LocalAI.
-
-    Uses the OpenAI-compatible ``/v1/embeddings`` endpoint provided by
-    LocalAI, keeping the pipeline model-agnostic.
-    """
+    """Generate dense embeddings for a batch of texts via LocalAI."""
     client = get_openai_client()
     t0 = time.perf_counter()
 
@@ -322,13 +361,7 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
 
 
 def _compute_sparse_vector(text: str, dimension: int = 1536) -> list[float]:
-    """Compute a simple TF-IDF-inspired sparse vector.
-
-    This is a lightweight approximation -- in production you would use a
-    proper sparse encoder (e.g. SPLADE). The vector is projected into the
-    same dimensionality as the dense embeddings so it can be stored in the
-    same Qdrant collection.
-    """
+    """Compute a simple TF-IDF-inspired sparse vector."""
     tokens = text.lower().split()
     if not tokens:
         return [0.0] * dimension
@@ -341,8 +374,7 @@ def _compute_sparse_vector(text: str, dimension: int = 1536) -> list[float]:
     # Hash-based projection into fixed-size vector
     vector = [0.0] * dimension
     for token, count in tf.items():
-        # Deterministic hash -> index
-        idx = int(hashlib.md5(token.encode()).hexdigest(), 16) % dimension
+        idx = int(hashlib.sha256(token.encode()).hexdigest(), 16) % dimension
         weight = 1.0 + math.log(count)
         vector[idx] += weight
 
@@ -388,38 +420,22 @@ def rerank_results(
     candidates: list[dict[str, Any]],
     top_n: int,
 ) -> list[dict[str, Any]]:
-    """Re-rank retrieval candidates using a cross-encoder score simulation.
-
-    In a full deployment this would call a dedicated cross-encoder model
-    (e.g. ``cross-encoder/ms-marco-MiniLM-L-6-v2``).  Here we approximate
-    the cross-encoder signal by combining:
-
-    1. The original vector similarity score from Qdrant.
-    2. A lexical overlap bonus (Jaccard similarity between query tokens and
-       chunk tokens) to reward keyword matches missed by dense retrieval.
-
-    This two-signal approach still provides measurable improvement over
-    single-stage vector search.
-    """
+    """Re-rank retrieval candidates using a cross-encoder score simulation."""
     query_tokens = set(query.lower().split())
 
     for candidate in candidates:
         chunk_text_content: str = candidate.get("text", "")
         chunk_tokens = set(chunk_text_content.lower().split())
 
-        # Jaccard similarity as lexical overlap signal
         intersection = query_tokens & chunk_tokens
         union = query_tokens | chunk_tokens
         lexical_score = len(intersection) / len(union) if union else 0.0
 
-        # Original vector similarity (Qdrant score is in [0, 1] for cosine)
         vector_score: float = candidate.get("score", 0.0)
 
-        # Combined cross-encoder score simulation
         rerank_score = 0.6 * vector_score + 0.4 * lexical_score
         candidate["rerank_score"] = round(rerank_score, 6)
 
-    # Sort descending by re-rank score and take top_n
     candidates.sort(key=lambda c: c["rerank_score"], reverse=True)
     return candidates[:top_n]
 
@@ -477,7 +493,7 @@ def _ensure_collection(collection_name: str) -> None:
     try:
         qclient.get_collection(collection_name)
         logger.debug("Collection '%s' already exists", collection_name)
-    except (UnexpectedResponse, Exception):
+    except UnexpectedResponse:
         logger.info(
             "Creating collection '%s' (dim=%d, distance=Cosine)",
             collection_name,
@@ -539,18 +555,18 @@ async def health_check() -> HealthResponse:
         qclient = get_qdrant_client()
         qclient.get_collections()
         deps["qdrant"] = "healthy"
-    except Exception as exc:
-        logger.warning("Qdrant health check failed: %s", exc)
-        deps["qdrant"] = f"unhealthy: {exc}"
+    except Exception:
+        logger.warning("Qdrant health check failed")
+        deps["qdrant"] = "unhealthy"
 
     # Check LocalAI (lightweight models list call)
     try:
         client = get_openai_client()
         client.models.list()
         deps["localai"] = "healthy"
-    except Exception as exc:
-        logger.warning("LocalAI health check failed: %s", exc)
-        deps["localai"] = f"unhealthy: {exc}"
+    except Exception:
+        logger.warning("LocalAI health check failed")
+        deps["localai"] = "unhealthy"
 
     overall = "healthy" if all("healthy" == v for v in deps.values()) else "degraded"
 
@@ -569,13 +585,7 @@ async def health_check() -> HealthResponse:
     summary="Ingest a document into the vector store",
 )
 async def ingest_document(request: IngestRequest) -> IngestResponse:
-    """Chunk, embed, and store a document in Qdrant.
-
-    Pipeline stages:
-    1. **Chunk** -- split the raw text into overlapping segments.
-    2. **Embed** -- generate vector embeddings for each chunk.
-    3. **Store** -- upsert the vectors and metadata into Qdrant.
-    """
+    """Chunk, embed, and store a document in Qdrant."""
     tracker = LatencyTracker()
     collection = request.collection_name or settings.collection_name
     document_id = _generate_document_id(request.text)
@@ -606,12 +616,12 @@ async def ingest_document(request: IngestRequest) -> IngestResponse:
     tracker.start("embedding")
     try:
         vectors = await embed_for_strategy(chunks)
-    except Exception as exc:
-        logger.error("Embedding failed: %s", exc)
+    except Exception:
+        logger.exception("Embedding failed")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Embedding service error: {exc}",
-        ) from exc
+            detail="Embedding service unavailable",
+        )
     tracker.stop()
 
     # --- 3. Storage --------------------------------------------------------
@@ -638,12 +648,12 @@ async def ingest_document(request: IngestRequest) -> IngestResponse:
         qclient.upsert(collection_name=collection, points=points)
     except HTTPException:
         raise
-    except Exception as exc:
-        logger.error("Qdrant upsert failed: %s", exc)
+    except Exception:
+        logger.exception("Qdrant upsert failed")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Vector store error: {exc}",
-        ) from exc
+            detail="Vector store unavailable",
+        )
     tracker.stop()
 
     logger.info(
@@ -669,14 +679,7 @@ async def ingest_document(request: IngestRequest) -> IngestResponse:
     summary="Query the RAG pipeline",
 )
 async def query_pipeline(request: QueryRequest) -> QueryResponse:
-    """Execute the full RAG retrieval-generation pipeline.
-
-    Pipeline stages:
-    1. **Embed** -- generate a query embedding.
-    2. **Retrieve** -- fetch top-K candidates from Qdrant.
-    3. **Re-rank** -- score and re-order candidates.
-    4. **Generate** -- produce an LLM answer grounded in the top-N chunks.
-    """
+    """Execute the full RAG retrieval-generation pipeline."""
     tracker = LatencyTracker()
     collection = request.collection_name or settings.collection_name
 
@@ -685,12 +688,12 @@ async def query_pipeline(request: QueryRequest) -> QueryResponse:
     try:
         query_vectors = await embed_for_strategy([request.query])
         query_vector = query_vectors[0]
-    except Exception as exc:
-        logger.error("Query embedding failed: %s", exc)
+    except Exception:
+        logger.exception("Query embedding failed")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Embedding service error: {exc}",
-        ) from exc
+            detail="Embedding service unavailable",
+        )
     tracker.stop()
 
     # --- 2. Retrieve -------------------------------------------------------
@@ -703,12 +706,12 @@ async def query_pipeline(request: QueryRequest) -> QueryResponse:
             limit=request.top_k,
             with_payload=True,
         )
-    except Exception as exc:
-        logger.error("Qdrant search failed: %s", exc)
+    except Exception:
+        logger.exception("Qdrant search failed")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Vector search error: {exc}",
-        ) from exc
+            detail="Vector search unavailable",
+        )
     tracker.stop()
 
     if not search_results:
@@ -746,12 +749,12 @@ async def query_pipeline(request: QueryRequest) -> QueryResponse:
     tracker.start("generation")
     try:
         answer = await generate_answer(request.query, context_chunks)
-    except Exception as exc:
-        logger.error("LLM generation failed: %s", exc)
+    except Exception:
+        logger.exception("LLM generation failed")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"LLM generation error: {exc}",
-        ) from exc
+            detail="LLM generation unavailable",
+        )
     tracker.stop()
 
     sources = (
@@ -793,12 +796,12 @@ async def list_collections() -> CollectionsResponse:
     try:
         qclient = get_qdrant_client()
         response = qclient.get_collections()
-    except Exception as exc:
-        logger.error("Failed to list collections: %s", exc)
+    except Exception:
+        logger.exception("Failed to list collections")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Vector store error: {exc}",
-        ) from exc
+            detail="Vector store unavailable",
+        )
 
     collections: list[CollectionInfo] = []
     for col in response.collections:
@@ -834,12 +837,12 @@ async def delete_collection(name: str) -> DeleteCollectionResponse:
     try:
         qclient = get_qdrant_client()
         result = qclient.delete_collection(collection_name=name)
-    except Exception as exc:
-        logger.error("Failed to delete collection '%s': %s", name, exc)
+    except Exception:
+        logger.exception("Failed to delete collection '%s'", name)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Vector store error: {exc}",
-        ) from exc
+            detail="Vector store unavailable",
+        )
 
     logger.info("Deleted collection '%s' (result=%s)", name, result)
     return DeleteCollectionResponse(deleted=bool(result), collection_name=name)
