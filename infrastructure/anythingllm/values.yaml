@@ -2,8 +2,25 @@ replicaCount: 1
 
 image:
   repository: mintplexlabs/anythingllm
-  tag: latest
+  tag: "1.0.0"
   pullPolicy: IfNotPresent
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+automountServiceAccountToken: false
 
 service:
   type: ClusterIP
@@ -13,11 +30,18 @@ env:
   LLM_PROVIDER: "localai"
   LOCAL_AI_BASE_PATH: "http://localai.ai-stack.svc.cluster.local:8080/v1"
   LOCAL_AI_MODEL_PREF: "mistral"
-  LOCAL_AI_API_KEY: "sk-no-key-required"
+  LOCAL_AI_API_KEY:
+    secretKeyRef:
+      name: anythingllm-secrets
+      key: LOCAL_AI_API_KEY
   EMBEDDING_ENGINE: "localai"
   EMBEDDING_MODEL_PREF: "text-embedding-ada-002"
   VECTOR_DB: "qdrant"
   QDRANT_ENDPOINT: "http://qdrant.ai-stack.svc.cluster.local:6333"
+  QDRANT_API_KEY:
+    secretKeyRef:
+      name: anythingllm-secrets
+      key: QDRANT_API_KEY
 
 persistence:
   enabled: true

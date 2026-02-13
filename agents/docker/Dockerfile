@@ -50,7 +50,7 @@ USER agents
 
 # Default environment variables (override at runtime).
 ENV LLM_BASE_URL="http://localai:8080/v1" \
-    LLM_API_KEY="sk-no-key-required" \
+    LLM_API_KEY="" \
     LLM_MODEL_NAME="gpt-3.5-turbo" \
     QDRANT_URL="http://qdrant:6333" \
     QDRANT_COLLECTION="documents" \

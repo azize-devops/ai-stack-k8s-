@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-python:
+    name: Python Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  lint-yaml:
+    name: YAML Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install yamllint
+      - run: yamllint -d relaxed .
+
+  validate-k8s:
+    name: Kubernetes Manifest Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: instrumenta/kubeval-action@master
+        with:
+          strict: true
+        env:
+          KUBEVAL_SCHEMA_LOCATION: "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master"
+      - name: Validate manifests
+        run: |
+          find infrastructure rag-pipeline -name '*.yaml' -not -name 'values.yaml' -not -name 'kustomization.yaml' | \
+            xargs -I{} kubeval --strict {} || true
+
+  docker-build-rag:
+    name: Build & Scan RAG Pipeline Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t rag-pipeline:ci -f rag-pipeline/docker/Dockerfile rag-pipeline/docker/
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: rag-pipeline:ci
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+
+  docker-build-agents:
+    name: Build & Scan Agents Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t ai-agents:ci -f agents/docker/Dockerfile agents/
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ai-agents:ci
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH

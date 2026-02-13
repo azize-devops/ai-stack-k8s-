@@ -62,7 +62,10 @@ DEFAULT_PROMPTS: list[str] = [
 # Model loading
 # ---------------------------------------------------------------------------
 
-def load_base_model(model_name: str) -> tuple[PreTrainedModel, PreTrainedTokenizerBase]:
+def load_base_model(
+    model_name: str,
+    trust_remote_code: bool = False,
+) -> tuple[PreTrainedModel, PreTrainedTokenizerBase]:
     """Load the base model in 4-bit quantisation and its tokenizer."""
     logger.info("Loading base model: %s", model_name)
     bnb_config = BitsAndBytesConfig(
@@ -72,7 +75,9 @@ def load_base_model(model_name: str) -> tuple[PreTrainedModel, PreTrainedTokeniz
         bnb_4bit_use_double_quant=True,
     )
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name, trust_remote_code=trust_remote_code,
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
@@ -81,7 +86,7 @@ def load_base_model(model_name: str) -> tuple[PreTrainedModel, PreTrainedTokeniz
         model_name,
         quantization_config=bnb_config,
         device_map="auto",
-        trust_remote_code=True,
+        trust_remote_code=trust_remote_code,
     )
     model.eval()
     return model, tokenizer
@@ -279,6 +284,7 @@ def evaluate(
     prompts: list[str],
     val_data_path: Path | None = None,
     max_new_tokens: int = 256,
+    trust_remote_code: bool = False,
 ) -> None:
     """End-to-end evaluation pipeline."""
     results: dict[str, Any] = {
@@ -289,7 +295,7 @@ def evaluate(
     }
 
     # ---- Base model inference --------------------------------------------
-    base_model, tokenizer = load_base_model(model_name)
+    base_model, tokenizer = load_base_model(model_name, trust_remote_code)
     base_results = run_inference(
         base_model, tokenizer, prompts, "BASE", max_new_tokens
     )
@@ -378,6 +384,12 @@ def parse_args() -> argparse.Namespace:
         default=256,
         help="Maximum number of new tokens to generate (default: %(default)s).",
     )
+    parser.add_argument(
+        "--trust-remote-code",
+        action="store_true",
+        default=False,
+        help="Allow executing remote code from HuggingFace model repos (default: False).",
+    )
     return parser.parse_args()
 
 
@@ -407,6 +419,7 @@ def main() -> None:
         prompts=prompts,
         val_data_path=args.val_data,
         max_new_tokens=args.max_new_tokens,
+        trust_remote_code=args.trust_remote_code,
     )
 
 

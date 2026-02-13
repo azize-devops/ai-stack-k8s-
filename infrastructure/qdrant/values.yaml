@@ -2,8 +2,25 @@ replicaCount: 1
 
 image:
   repository: qdrant/qdrant
-  tag: latest
+  tag: "v1.12.5"
   pullPolicy: IfNotPresent
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+automountServiceAccountToken: false
 
 service:
   type: ClusterIP
@@ -36,3 +53,4 @@ config:
   service:
     grpc_port: 6334
     http_port: 6333
+    api_key: "${QDRANT_API_KEY}"
