@@ -21,3 +21,4 @@ data:
   TOP_N: "3"
   LOG_LEVEL: "INFO"
   DOCUMENT_STORAGE_PATH: "/data/documents"
+  CORS_ORIGINS: ""

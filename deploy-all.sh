@@ -12,22 +12,32 @@ echo "============================================"
 echo ""
 
 # Step 1: Namespace
-echo "[1/6] Creating namespace..."
+echo "[1/8] Creating namespace..."
 kubectl apply -f "$SCRIPT_DIR/infrastructure/namespace/namespace.yaml"
 echo ""
 
-# Step 2: Qdrant (no GPU dependency, starts fast)
-echo "[2/6] Installing Qdrant..."
+# Step 2: Resource Quota & LimitRange
+echo "[2/8] Applying resource quota and limit range..."
+kubectl apply -f "$SCRIPT_DIR/infrastructure/namespace/resource-quota.yaml"
+echo ""
+
+# Step 3: Network Policies
+echo "[3/8] Applying network policies..."
+kubectl apply -f "$SCRIPT_DIR/infrastructure/network-policies/"
+echo ""
+
+# Step 4: Qdrant (no GPU dependency, starts fast)
+echo "[4/8] Installing Qdrant..."
 bash "$SCRIPT_DIR/infrastructure/qdrant/install.sh"
 echo ""
 
-# Step 3: LocalAI
-echo "[3/6] Installing LocalAI..."
+# Step 5: LocalAI
+echo "[5/8] Installing LocalAI..."
 bash "$SCRIPT_DIR/infrastructure/localai/install.sh"
 echo ""
 
-# Step 4: Ollama
-echo "[4/6] Installing Ollama..."
+# Step 6: Ollama
+echo "[6/8] Installing Ollama..."
 kubectl apply -f "$SCRIPT_DIR/infrastructure/ollama/pvc.yaml"
 kubectl apply -f "$SCRIPT_DIR/infrastructure/ollama/deployment.yaml"
 kubectl apply -f "$SCRIPT_DIR/infrastructure/ollama/service.yaml"
@@ -35,13 +45,13 @@ echo "Waiting for Ollama to be ready..."
 kubectl rollout status deployment/ollama -n "$NAMESPACE" --timeout=10m
 echo ""
 
-# Step 5: AnythingLLM
-echo "[5/6] Installing AnythingLLM..."
+# Step 7: AnythingLLM
+echo "[7/8] Installing AnythingLLM..."
 bash "$SCRIPT_DIR/infrastructure/anythingllm/install.sh"
 echo ""
 
-# Step 6: RAG Pipeline
-echo "[6/6] Deploying RAG Pipeline..."
+# Step 8: RAG Pipeline
+echo "[8/8] Deploying RAG Pipeline..."
 kubectl apply -k "$SCRIPT_DIR/rag-pipeline/"
 kubectl rollout status deployment/rag-pipeline -n "$NAMESPACE" --timeout=5m
 echo ""

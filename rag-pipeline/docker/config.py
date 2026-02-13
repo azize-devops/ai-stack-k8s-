@@ -114,6 +114,9 @@ class Settings:
     collection_name: str = field(
         default_factory=lambda: _env("COLLECTION_NAME", "knowledge_base")
     )
+    qdrant_api_key: str = field(
+        default_factory=lambda: _env("QDRANT_API_KEY", "")
+    )
 
     # --- Embedding strategy ---
     embedding_strategy: EmbeddingStrategy = field(default=EmbeddingStrategy.DENSE)

@@ -3,13 +3,30 @@ replicaCount: 1
 deployment:
   image:
     repository: quay.io/go-skynet/local-ai
-    tag: latest
+    tag: "v2.25.0"
   env:
     threads: "4"
     context_size: "512"
     models_path: "/models"
-    debug: "true"
+    debug: "false"
     galleries: '[{"name":"model-gallery", "url":"github:mudler/LocalAI/gallery/index.yaml@master"}]'
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+automountServiceAccountToken: false
 
 resources:
   requests:

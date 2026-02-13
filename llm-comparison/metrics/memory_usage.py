@@ -193,7 +193,7 @@ def get_pod_memory(
         logger.info("kubectl not found -- skipping pod memory query")
     except subprocess.TimeoutExpired:
         logger.warning("kubectl top timed out")
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         logger.warning("Unexpected error querying pod memory: %s", exc)
 
     # --- Fetch memory limit from pod spec ---
@@ -220,7 +220,7 @@ def get_pod_memory(
                     if limit:
                         metrics.pod_memory_limit_mb = _parse_k8s_memory(limit)
                     break
-    except Exception:
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError, KeyError):
         pass  # non-critical
 
     return metrics

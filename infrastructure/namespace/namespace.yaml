@@ -5,3 +5,9 @@ metadata:
   labels:
     app.kubernetes.io/part-of: ai-stack
     app.kubernetes.io/managed-by: manual
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest

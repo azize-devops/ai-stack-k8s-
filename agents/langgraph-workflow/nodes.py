@@ -36,7 +36,7 @@ def _get_llm() -> ChatOpenAI:
     return ChatOpenAI(
         model=os.getenv("LLM_MODEL_NAME", "gpt-3.5-turbo"),
         base_url=os.getenv("LLM_BASE_URL", "http://localai:8080/v1"),
-        api_key=os.getenv("LLM_API_KEY", "sk-no-key-required"),
+        api_key=os.getenv("LLM_API_KEY", ""),
         temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")),
         max_tokens=int(os.getenv("LLM_MAX_TOKENS", "2048")),
         request_timeout=int(os.getenv("LLM_TIMEOUT", "120")),

@@ -43,7 +43,7 @@ def _build_llm() -> ChatOpenAI:
     config = _load_config().get("llm", {})
 
     base_url = os.getenv("LLM_BASE_URL", config.get("base_url", "http://localai:8080/v1"))
-    api_key = os.getenv("LLM_API_KEY", config.get("api_key", "sk-no-key-required"))
+    api_key = os.getenv("LLM_API_KEY", config.get("api_key", ""))
     model = os.getenv("LLM_MODEL_NAME", config.get("model", "gpt-3.5-turbo"))
     temperature = float(os.getenv("LLM_TEMPERATURE", str(config.get("temperature", 0.7))))
     max_tokens = int(os.getenv("LLM_MAX_TOKENS", str(config.get("max_tokens", 4096))))
