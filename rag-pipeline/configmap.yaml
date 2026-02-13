@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rag-pipeline-config
+  namespace: ai-stack
+  labels:
+    app: rag-pipeline
+    component: pipeline
+data:
+  LOCALAI_URL: "http://localai.ai-stack.svc.cluster.local:8080/v1"
+  OLLAMA_URL: "http://ollama.ai-stack.svc.cluster.local:11434"
+  QDRANT_URL: "http://qdrant.ai-stack.svc.cluster.local:6333"
+  EMBEDDING_MODEL: "text-embedding-ada-002"
+  LLM_MODEL: "gpt-3.5-turbo"
+  CHUNK_SIZE: "512"
+  CHUNK_OVERLAP: "50"
+  COLLECTION_NAME: "knowledge_base"
+  EMBEDDING_STRATEGY: "dense"
+  EMBEDDING_DIMENSION: "1536"
+  TOP_K: "10"
+  TOP_N: "3"
+  LOG_LEVEL: "INFO"
+  DOCUMENT_STORAGE_PATH: "/data/documents"

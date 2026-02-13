@@ -1,0 +1,35 @@
+replicaCount: 1
+
+image:
+  repository: mintplexlabs/anythingllm
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3001
+
+env:
+  LLM_PROVIDER: "localai"
+  LOCAL_AI_BASE_PATH: "http://localai.ai-stack.svc.cluster.local:8080/v1"
+  LOCAL_AI_MODEL_PREF: "mistral"
+  LOCAL_AI_API_KEY: "sk-no-key-required"
+  EMBEDDING_ENGINE: "localai"
+  EMBEDDING_MODEL_PREF: "text-embedding-ada-002"
+  VECTOR_DB: "qdrant"
+  QDRANT_ENDPOINT: "http://qdrant.ai-stack.svc.cluster.local:6333"
+
+persistence:
+  enabled: true
+  storageClass: "longhorn"
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "1"
+    memory: "2Gi"

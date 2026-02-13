@@ -1,0 +1,119 @@
+# CrewAI Research Pipeline Configuration
+# ----------------------------------------
+# This configuration defines agents, tasks, and LLM settings for the
+# multi-agent research pipeline. All LLM calls use an OpenAI-compatible
+# API so the same config works with LocalAI, Ollama (via proxy), or OpenAI.
+
+llm:
+  provider: "openai-compatible"
+  base_url: "http://localai:8080/v1"
+  api_key: "sk-no-key-required"
+  model: "gpt-3.5-turbo"
+  temperature: 0.7
+  max_tokens: 4096
+  request_timeout: 120
+
+agents:
+  researcher:
+    role: "Senior Research Analyst"
+    goal: >
+      Find comprehensive, accurate, and up-to-date information on the
+      given topic. Identify key facts, trends, statistics, and expert
+      opinions. Organize findings into clear research notes.
+    backstory: >
+      You are a seasoned research analyst with over 15 years of experience
+      in technical and scientific research. You have a keen eye for detail,
+      always verify your sources, and excel at synthesizing complex
+      information from multiple domains into coherent research briefs.
+    allow_delegation: false
+    verbose: true
+
+  writer:
+    role: "Technical Writer"
+    goal: >
+      Create a clear, well-organized, and engaging technical report based
+      on the research findings. The report should have a logical structure
+      with an introduction, key findings, analysis, and conclusion.
+    backstory: >
+      You are an award-winning technical writer who has authored dozens of
+      whitepapers and research reports for Fortune 500 companies. You
+      specialize in transforming complex technical information into
+      accessible, well-structured documents that both technical and
+      non-technical audiences can understand.
+    allow_delegation: false
+    verbose: true
+
+  reviewer:
+    role: "Quality Reviewer"
+    goal: >
+      Review the report for factual accuracy, logical consistency,
+      completeness, clarity, and professional quality. Provide a final
+      quality score and actionable feedback.
+    backstory: >
+      You are a meticulous editor and quality assurance specialist with
+      a background in peer-reviewed academic publishing. You have reviewed
+      thousands of technical documents and are known for your high
+      standards, constructive feedback, and ability to catch errors that
+      others miss.
+    allow_delegation: false
+    verbose: true
+
+tasks:
+  research:
+    description: >
+      Conduct thorough research on the following topic: {topic}
+
+      Your research should cover:
+      1. Key definitions and core concepts
+      2. Current state of the art and recent developments
+      3. Major players, tools, or frameworks involved
+      4. Benefits and challenges
+      5. Real-world use cases or case studies
+      6. Future outlook and emerging trends
+
+      Provide detailed research notes with specific facts, data points,
+      and references where possible.
+    expected_output: >
+      Comprehensive research notes organized by subtopic, including key
+      facts, statistics, expert opinions, and references. The notes
+      should be detailed enough for a technical writer to produce a
+      complete report.
+
+  writing:
+    description: >
+      Using the research findings provided, create a professional
+      technical report on: {topic}
+
+      The report must include:
+      1. Executive Summary (2-3 paragraphs)
+      2. Introduction and Background
+      3. Key Findings (organized by theme)
+      4. Analysis and Discussion
+      5. Conclusion and Recommendations
+      6. References
+
+      Write in a professional but accessible tone. Use clear headings,
+      bullet points where appropriate, and ensure logical flow between
+      sections.
+    expected_output: >
+      A complete, well-structured technical report of approximately
+      1500-2500 words with all required sections, proper formatting,
+      and clear, professional language.
+
+  review:
+    description: >
+      Review the following technical report on: {topic}
+
+      Evaluate the report on these criteria:
+      1. Factual Accuracy -- Are claims supported and plausible?
+      2. Completeness -- Does it cover the topic thoroughly?
+      3. Structure -- Is it logically organized?
+      4. Clarity -- Is the writing clear and accessible?
+      5. Professional Quality -- Does it meet publication standards?
+
+      For each criterion, provide a score from 1-10 and specific feedback.
+      Calculate an overall quality score.
+    expected_output: >
+      A structured review with scores (1-10) for each criterion, specific
+      feedback for improvement, an overall quality score, and a final
+      recommendation (publish as-is, minor revisions, major revisions).

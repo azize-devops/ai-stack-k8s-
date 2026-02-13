@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-pipeline
+  namespace: ai-stack
+  labels:
+    app: rag-pipeline
+    component: pipeline
+spec:
+  type: ClusterIP
+  selector:
+    app: rag-pipeline
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP

@@ -1,0 +1,38 @@
+replicaCount: 1
+
+image:
+  repository: qdrant/qdrant
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 6333
+      targetPort: 6333
+    - name: grpc
+      port: 6334
+      targetPort: 6334
+
+persistence:
+  enabled: true
+  storageClass: "longhorn"
+  accessModes:
+    - ReadWriteOnce
+  size: 20Gi
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "1"
+    memory: "2Gi"
+
+config:
+  storage:
+    storage_path: /qdrant/storage
+  service:
+    grpc_port: 6334
+    http_port: 6333

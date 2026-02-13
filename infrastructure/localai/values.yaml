@@ -1,0 +1,38 @@
+replicaCount: 1
+
+deployment:
+  image:
+    repository: quay.io/go-skynet/local-ai
+    tag: latest
+  env:
+    threads: "4"
+    context_size: "512"
+    models_path: "/models"
+    debug: "true"
+    galleries: '[{"name":"model-gallery", "url":"github:mudler/LocalAI/gallery/index.yaml@master"}]'
+
+resources:
+  requests:
+    cpu: "2"
+    memory: "4Gi"
+  limits:
+    cpu: "4"
+    memory: "8Gi"
+    nvidia.com/gpu: "1"
+
+persistence:
+  models:
+    enabled: true
+    storageClass: "longhorn"
+    accessModes:
+      - ReadWriteOnce
+    size: 50Gi
+
+service:
+  type: ClusterIP
+  port: 8080
+
+tolerations:
+  - key: "nvidia.com/gpu"
+    operator: "Exists"
+    effect: "NoSchedule"

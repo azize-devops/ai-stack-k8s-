@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+*.env.local
+
+# Model files (large binaries)
+*.bin
+*.pt
+*.pth
+*.safetensors
+*.gguf
+*.onnx
+models/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_metadata
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Data (keep sample, ignore large datasets)
+fine-tuning/data/*.jsonl
+!fine-tuning/data/sample_dataset.jsonl
+
+# Benchmark outputs
+llm-comparison/benchmark_results.json
+
+# Docker
+.dockerignore
