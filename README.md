@@ -45,7 +45,7 @@ The stack brings together dual LLM backends (LocalAI and Ollama), a Qdrant vecto
                     |    |              |   |                              |
                     |    +---------+----+   |                              |
                     |              |        |                              |
-              +-----+------+ +----v--------v----+                           |
+              +-----+------+ +----v--------v----+                          |
               |   Ollama   | |  RAG Pipeline    |                          |
               | (LLM Alt)  | |  (FastAPI)       |                          |
               |  :11434    | |  :8000           |                          |
